@@ -3650,6 +3650,11 @@ static int xmit_one(struct sk_buff *skb, struct net_device *dev,
 	if (dev_nit_active(dev))
 		dev_queue_xmit_nit(skb, dev);
 
+#ifdef CONFIG_ETHERNET_PACKET_MANGLE
+	if (dev->eth_mangle_tx && !(skb = dev->eth_mangle_tx(dev, skb)))
+		return NETDEV_TX_OK;
+#endif
+
 	len = skb->len;
 	PRANDOM_ADD_NOISE(skb, dev, txq, len + jiffies);
 	trace_net_dev_start_xmit(skb, dev);
