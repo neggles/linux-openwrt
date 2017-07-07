@@ -112,7 +112,7 @@ config SATA_ZPODD
 
 config SATA_PMP
 	bool "SATA Port Multiplier support"
-	depends on SATA_HOST
+	select SATA_HOST
 	default y
 	help
 	  This option adds support for SATA Port Multipliers
