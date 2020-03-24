@@ -195,3 +195,12 @@ config MTD_REDBOOT_PARTS_READONLY
 	  'FIS directory' images, enable this option.
 
 endif # MTD_REDBOOT_PARTS
+
+config MTD_ROUTERBOOT_PARTS
+	tristate "RouterBoot flash partition parser"
+	depends on MTD && OF
+	help
+	 MikroTik RouterBoot is implemented as a multi segment system on the
+	 flash, some of which are fixed and some of which are located at
+	 variable offsets. This parser handles both cases via properly
+	 formatted DTS.
