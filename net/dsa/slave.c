@@ -2199,9 +2199,12 @@ static int dsa_slave_switchdev_event(struct notifier_block *unused,
 			else if (!fdb_info->added_by_user)
 				return NOTIFY_OK;
 		} else {
-			/* Snoop addresses learnt on foreign interfaces
-			 * bridged with us, for switches that don't
-			 * automatically learn SA from CPU-injected traffic
+			/* Snoop addresses added to foreign interfaces
+			 * bridged with us, or the bridge
+			 * itself. Dynamically learned addresses can
+			 * also be added for switches that don't
+			 * automatically learn SA from CPU-injected
+			 * traffic.
 			 */
 			struct net_device *br_dev;
 			struct dsa_slave_priv *p;
@@ -2223,7 +2226,8 @@ static int dsa_slave_switchdev_event(struct notifier_block *unused,
 
 			dp = p->dp->cpu_dp;
 
-			if (!dp->ds->assisted_learning_on_cpu_port)
+			if (!fdb_info->added_by_user &&
+			    !dp->ds->assisted_learning_on_cpu_port)
 				return NOTIFY_DONE;
 		}
 
