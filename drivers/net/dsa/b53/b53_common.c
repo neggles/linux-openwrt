@@ -349,7 +349,7 @@ static void b53_set_forwarding(struct b53_device *dev, int enable)
 	b53_write8(dev, B53_CTRL_PAGE, B53_IP_MULTICAST_CTRL, mgmt);
 }
 
-static void b53_enable_vlan(struct b53_device *dev, bool enable,
+static void b53_enable_vlan(struct b53_device *dev, int port, bool enable,
 			    bool enable_filtering)
 {
 	u8 mgmt, vc0, vc1, vc4 = 0, vc5;
@@ -431,6 +431,9 @@ static void b53_enable_vlan(struct b53_device *dev, bool enable,
 	b53_write8(dev, B53_CTRL_PAGE, B53_SWITCH_MODE, mgmt);
 
 	dev->vlan_enabled = enable;
+
+	dev_dbg(dev->dev, "Port %d VLAN enabled: %d, filtering: %d\n",
+		port, enable, enable_filtering);
 }
 
 static int b53_set_jumbo(struct b53_device *dev, bool enable, bool allow_10_100)
@@ -708,7 +711,7 @@ int b53_configure_vlan(struct dsa_switch *ds)
 		b53_do_vlan_op(dev, VTA_CMD_CLEAR);
 	}
 
-	b53_enable_vlan(dev, dev->vlan_enabled, ds->vlan_filtering);
+	b53_enable_vlan(dev, -1, dev->vlan_enabled, ds->vlan_filtering);
 
 	b53_for_each_port(dev, i)
 		b53_write16(dev, B53_VLAN_PAGE,
@@ -1390,7 +1393,7 @@ int b53_vlan_filtering(struct dsa_switch *ds, int port, bool vlan_filtering,
 	if (switchdev_trans_ph_prepare(trans))
 		return 0;
 
-	b53_enable_vlan(dev, dev->vlan_enabled, vlan_filtering);
+	b53_enable_vlan(dev, port, dev->vlan_enabled, vlan_filtering);
 
 	return 0;
 }
@@ -1415,7 +1418,7 @@ int b53_vlan_prepare(struct dsa_switch *ds, int port,
 	if (vlan->vid_end >= dev->num_vlans)
 		return -ERANGE;
 
-	b53_enable_vlan(dev, true, ds->vlan_filtering);
+	b53_enable_vlan(dev, port, true, ds->vlan_filtering);
 
 	return 0;
 }
