@@ -40,10 +40,11 @@ static struct mtd_info *allocate_partition(struct mtd_info *parent,
 	struct mtd_info *master = mtd_get_master(parent);
 	int wr_alignment = (parent->flags & MTD_NO_ERASE) ?
 			   master->writesize : master->erasesize;
+	int wr_alignment_minor = 0;
 	u64 parent_size = mtd_is_partition(parent) ?
 			  parent->part.size : parent->size;
 	struct mtd_info *child;
-	u32 remainder;
+	u32 remainder, remainder_minor;
 	char *name;
 	u64 tmp;
 
@@ -145,6 +146,7 @@ static struct mtd_info *allocate_partition(struct mtd_info *parent,
 		int i, max = parent->numeraseregions;
 		u64 end = child->part.offset + child->part.size;
 		struct mtd_erase_region_info *regions = parent->eraseregions;
+		uint32_t erasesize_minor = child->erasesize;
 
 		/* Find the first erase regions which is part of this
 		 * partition. */
@@ -155,15 +157,24 @@ static struct mtd_info *allocate_partition(struct mtd_info *parent,
 		if (i > 0)
 			i--;
 
-		/* Pick biggest erasesize */
 		for (; i < max && regions[i].offset < end; i++) {
+			/* Pick biggest erasesize */
 			if (child->erasesize < regions[i].erasesize)
 				child->erasesize = regions[i].erasesize;
+			/* Pick smallest non-zero erasesize */
+			if ((erasesize_minor > regions[i].erasesize) && (regions[i].erasesize > 0))
+				erasesize_minor = regions[i].erasesize;
 		}
+
+		if (erasesize_minor < child->erasesize)
+			child->erasesize_minor = erasesize_minor;
+
 		BUG_ON(child->erasesize == 0);
 	} else {
 		/* Single erase size */
 		child->erasesize = master->erasesize;
+		if (master->erasesize_minor)
+			child->erasesize_minor = master->erasesize_minor;
 	}
 
 	/*
@@ -171,26 +182,43 @@ static struct mtd_info *allocate_partition(struct mtd_info *parent,
 	 * exposes several regions with different erasesize. Adjust
 	 * wr_alignment accordingly.
 	 */
-	if (!(child->flags & MTD_NO_ERASE))
+	if (!(child->flags & MTD_NO_ERASE)) {
 		wr_alignment = child->erasesize;
+		if (IS_ENABLED(CONFIG_MTD_SPI_NOR_USE_VARIABLE_ERASE) && child->erasesize_minor)
+			wr_alignment_minor = child->erasesize_minor;
+	}
 
 	tmp = mtd_get_master_ofs(child, 0);
 	remainder = do_div(tmp, wr_alignment);
 	if ((child->flags & MTD_WRITEABLE) && remainder) {
-		/* Doesn't start on a boundary of major erase size */
-		/* FIXME: Let it be writable if it is on a boundary of
-		 * _minor_ erase size though */
-		child->flags &= ~MTD_WRITEABLE;
-		printk(KERN_WARNING"mtd: partition \"%s\" doesn't start on an erase/write block boundary -- force read-only\n",
-			part->name);
+		if (wr_alignment_minor) {
+			tmp = mtd_get_master_ofs(child, 0);
+			remainder_minor = do_div(tmp, wr_alignment_minor);
+			if (remainder_minor == 0)
+				child->erasesize = child->erasesize_minor;
+		}
+
+		if ((!wr_alignment_minor) || (wr_alignment_minor && remainder_minor != 0)) {
+			child->flags &= ~MTD_WRITEABLE;
+			printk(KERN_WARNING"mtd: partition \"%s\" doesn't start on an erase/write block boundary -- force read-only\n",
+				part->name);
+		}
 	}
 
 	tmp = mtd_get_master_ofs(child, 0) + child->part.size;
 	remainder = do_div(tmp, wr_alignment);
 	if ((child->flags & MTD_WRITEABLE) && remainder) {
-		child->flags &= ~MTD_WRITEABLE;
-		printk(KERN_WARNING"mtd: partition \"%s\" doesn't end on an erase/write block -- force read-only\n",
-			part->name);
+		if (wr_alignment_minor) {
+			tmp = mtd_get_master_ofs(child, 0) + child->part.size;
+			remainder_minor = do_div(tmp, wr_alignment_minor);
+			if (remainder_minor == 0)
+				child->erasesize = child->erasesize_minor;
+		}
+		if ((!wr_alignment_minor) || (wr_alignment_minor && remainder_minor != 0)) {
+			child->flags &= ~MTD_WRITEABLE;
+			printk(KERN_WARNING"mtd: partition \"%s\" doesn't end on an erase/write block -- force read-only\n",
+				part->name);
+		}
 	}
 
 	child->size = child->part.size;
