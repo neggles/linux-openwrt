@@ -1049,6 +1049,11 @@ static int b53_setup(struct dsa_switch *ds)
 	unsigned int port;
 	int ret;
 
+	/* Request bridge PVID untagged when DSA_TAG_PROTO_NONE is set
+	 * which forces the CPU port to be tagged in all VLANs.
+	 */
+	ds->untag_bridge_pvid = dev->tag_protocol == DSA_TAG_PROTO_NONE;
+
 	ret = b53_reset_switch(dev);
 	if (ret) {
 		dev_err(ds->dev, "failed to reset switch\n");
@@ -1423,6 +1428,13 @@ int b53_vlan_prepare(struct dsa_switch *ds, int port,
 	return 0;
 }
 EXPORT_SYMBOL(b53_vlan_prepare);
+ 
+static bool b53_vlan_port_needs_forced_tagged(struct dsa_switch *ds, int port)
+{
+	struct b53_device *dev = ds->priv;
+
+	return dev->tag_protocol == DSA_TAG_PROTO_NONE && dsa_is_cpu_port(ds, port);
+}
 
 void b53_vlan_add(struct dsa_switch *ds, int port,
 		  const struct switchdev_obj_port_vlan *vlan)
@@ -1442,7 +1454,7 @@ void b53_vlan_add(struct dsa_switch *ds, int port,
 			untagged = true;
 
 		vl->members |= BIT(port);
-		if (untagged && !dsa_is_cpu_port(ds, port))
+		if (untagged && !b53_vlan_port_needs_forced_tagged(ds, port))
 			vl->untag |= BIT(port);
 		else
 			vl->untag &= ~BIT(port);
@@ -1480,7 +1492,7 @@ int b53_vlan_del(struct dsa_switch *ds, int port,
 		if (pvid == vid)
 			pvid = b53_default_pvid(dev);
 
-		if (untagged && !dsa_is_cpu_port(ds, port))
+		if (untagged && !b53_vlan_port_needs_forced_tagged(ds, port))
 			vl->untag &= ~(BIT(port));
 
 		b53_set_vlan_entry(dev, vid, vl);
@@ -2644,7 +2656,6 @@ struct b53_device *b53_switch_alloc(struct device *base,
 	dev->ops = ops;
 	ds->ops = &b53_switch_ops;
 	ds->configure_vlan_while_not_filtering = true;
-	ds->untag_bridge_pvid = true;
 	dev->vlan_enabled = ds->configure_vlan_while_not_filtering;
 	/* Let DSA handle the case were multiple bridges span the same switch
 	 * device and different VLAN awareness settings are requested, which
