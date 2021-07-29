@@ -104,7 +104,7 @@ static struct sk_buff *mtk_tag_rcv(struct sk_buff *skb, struct net_device *dev,
 
 	/* Only unicast or broadcast frames are offloaded */
 	if (likely(!is_multicast_skb))
-		skb->offload_fwd_mark = 1;
+		dsa_default_offload_fwd_mark(skb);
 
 	return skb;
 }
