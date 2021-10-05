@@ -375,6 +375,7 @@ static void emit_atomic_r64(struct jit_context *ctx,
 	u8 t1 = MIPS_R_T6;
 	u8 t2 = MIPS_R_T7;
 
+	LLSC_sync(ctx);
 	emit(ctx, lld, t1, off, dst);
 	switch (code) {
 	case BPF_ADD:
@@ -391,7 +392,7 @@ static void emit_atomic_r64(struct jit_context *ctx,
 		break;
 	}
 	emit(ctx, scd, t2, off, dst);
-	emit(ctx, beqz, t2, -16);
+	emit(ctx, LLSC_beqz, t2, -16 - LLSC_offset);
 	emit(ctx, nop); /* Delay slot */
 }
 
@@ -414,7 +415,7 @@ static int emit_call(struct jit_context *ctx, const struct bpf_insn *insn)
 	push_regs(ctx, ctx->clobbered & JIT_CALLER_REGS, 0, 0);
 
 	/* Emit function call */
-	emit_mov_i64(ctx, tmp, addr);
+	emit_mov_i64(ctx, tmp, addr & JALR_MASK);
 	emit(ctx, jalr, MIPS_R_RA, tmp);
 	emit(ctx, nop); /* Delay slot */
 
