@@ -1586,6 +1586,26 @@ static int mv88e6xxx_port_check_hw_vlan(struct dsa_switch *ds, int port,
 	return 0;
 }
 
+static int mv88e6xxx_port_commit_pvid(struct mv88e6xxx_chip *chip, int port)
+{
+	struct dsa_port *dp = dsa_to_port(chip->ds, port);
+	struct mv88e6xxx_port *p = &chip->ports[port];
+	bool drop_untagged = false;
+	u16 pvid = 0;
+	int err;
+
+	if (dp->bridge_dev && br_vlan_enabled(dp->bridge_dev)) {
+		pvid = p->bridge_pvid.vid;
+		drop_untagged = !p->bridge_pvid.valid;
+	}
+
+	err = mv88e6xxx_port_set_pvid(chip, port, pvid);
+	if (err)
+		return err;
+
+	return mv88e6xxx_port_drop_untagged(chip, port, drop_untagged);
+}
+
 static int mv88e6xxx_port_vlan_filtering(struct dsa_switch *ds, int port,
 					 bool vlan_filtering,
 					 struct switchdev_trans *trans)
@@ -1599,7 +1619,16 @@ static int mv88e6xxx_port_vlan_filtering(struct dsa_switch *ds, int port,
 		return chip->info->max_vid ? 0 : -EOPNOTSUPP;
 
 	mv88e6xxx_reg_lock(chip);
+
 	err = mv88e6xxx_port_set_8021q_mode(chip, port, mode);
+	if (err)
+		goto unlock;
+
+	err = mv88e6xxx_port_commit_pvid(chip, port);
+	if (err)
+		goto unlock;
+
+unlock:
 	mv88e6xxx_reg_unlock(chip);
 
 	return err;
@@ -1982,8 +2011,10 @@ static void mv88e6xxx_port_vlan_add(struct dsa_switch *ds, int port,
 	struct mv88e6xxx_chip *chip = ds->priv;
 	bool untagged = vlan->flags & BRIDGE_VLAN_INFO_UNTAGGED;
 	bool pvid = vlan->flags & BRIDGE_VLAN_INFO_PVID;
+	struct mv88e6xxx_port *p = &chip->ports[port];
 	bool warn;
 	u8 member;
+	int err;
 	u16 vid;
 
 	if (!chip->info->max_vid)
@@ -2008,9 +2039,23 @@ static void mv88e6xxx_port_vlan_add(struct dsa_switch *ds, int port,
 			dev_err(ds->dev, "p%d: failed to add VLAN %d%c\n", port,
 				vid, untagged ? 'u' : 't');
 
-	if (pvid && mv88e6xxx_port_set_pvid(chip, port, vlan->vid_end))
-		dev_err(ds->dev, "p%d: failed to set PVID %d\n", port,
-			vlan->vid_end);
+	if (pvid) {
+		p->bridge_pvid.vid = vlan->vid_end;
+		p->bridge_pvid.valid = true;
+
+		err = mv88e6xxx_port_commit_pvid(chip, port);
+		if (err)
+			dev_err(ds->dev, "p%d: failed to set PVID %d", port,
+				vlan->vid_end);
+	} else if (vlan->vid_end && p->bridge_pvid.vid == vlan->vid_end) {
+		/* The old pvid was reinstalled as a non-pvid VLAN */
+		p->bridge_pvid.valid = false;
+
+		err = mv88e6xxx_port_commit_pvid(chip, port);
+		if (err)
+			dev_err(ds->dev, "p%d: failed to unset PVID %d", port,
+				vlan->vid_end);
+	}
 
 	mv88e6xxx_reg_unlock(chip);
 }
@@ -2061,6 +2106,7 @@ static int mv88e6xxx_port_vlan_del(struct dsa_switch *ds, int port,
 				   const struct switchdev_obj_port_vlan *vlan)
 {
 	struct mv88e6xxx_chip *chip = ds->priv;
+	struct mv88e6xxx_port *p = &chip->ports[port];
 	u16 pvid, vid;
 	int err = 0;
 
@@ -2079,7 +2125,9 @@ static int mv88e6xxx_port_vlan_del(struct dsa_switch *ds, int port,
 			goto unlock;
 
 		if (vid == pvid) {
-			err = mv88e6xxx_port_set_pvid(chip, port, 0);
+			p->bridge_pvid.valid = false;
+
+			err = mv88e6xxx_port_commit_pvid(chip, port);
 			if (err)
 				goto unlock;
 		}
