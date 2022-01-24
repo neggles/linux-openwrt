@@ -162,9 +162,11 @@ static int dsa_switch_bridge_leave(struct dsa_switch *ds,
 						info->sw_index, info->port,
 						info->br);
 
-	err = dsa_switch_sync_vlan_filtering(ds, info);
-	if (err)
-		return err;
+	if (dst->index == info->tree_index && ds->index == info->sw_index) {
+		err = dsa_switch_sync_vlan_filtering(ds, info);
+		if (err)
+			return err;
+	}
 
 	return 0;
 }
