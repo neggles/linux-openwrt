@@ -3958,7 +3958,7 @@ static void mvneta_mac_config(struct phylink_config *config, unsigned int mode,
 	/* Even though it might look weird, when we're configured in
 	 * SGMII or QSGMII mode, the RGMII bit needs to be set.
 	 */
-	new_ctrl2 |= MVNETA_GMAC2_PORT_RGMII;
+	new_ctrl2 &= ~MVNETA_GMAC2_PORT_RGMII;
 
 	if (state->interface == PHY_INTERFACE_MODE_QSGMII ||
 	    state->interface == PHY_INTERFACE_MODE_SGMII ||
@@ -5243,6 +5243,8 @@ static void mvneta_conf_mbus_windows(struct mvneta_port *pp,
 /* Power up the port */
 static int mvneta_port_power_up(struct mvneta_port *pp, int phy_mode)
 {
+	u32 val;
+
 	/* MAC Cause register should be cleared */
 	mvreg_write(pp, MVNETA_UNIT_INTR_CAUSE, 0);
 
@@ -5251,6 +5253,14 @@ static int mvneta_port_power_up(struct mvneta_port *pp, int phy_mode)
 	    !phy_interface_mode_is_8023z(phy_mode) &&
 	    !phy_interface_mode_is_rgmii(phy_mode))
 		return -EINVAL;
+
+	val = mvreg_read(pp, 0x243c);
+	pr_err("mvneta: register 0x243c original value: %llx\n", val);
+
+	val |= BIT(28)|BIT(29)|BIT(30);
+	pr_err("mvneta: register 0x243c modified value: %llx\n", val);
+
+	mvreg_write(pp, 0x243c, val);
 
 	return 0;
 }
