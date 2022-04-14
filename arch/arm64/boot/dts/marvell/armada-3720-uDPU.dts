@@ -162,7 +162,7 @@
 };
 
 &eth0 {
-	phy-mode = "sgmii";
+	phy-mode = "2500base-x";
 	status = "okay";
 	managed = "in-band-status";
 	phys = <&comphy1 0>;
@@ -170,7 +170,7 @@
 };
 
 &eth1 {
-	phy-mode = "sgmii";
+	phy-mode = "2500base-x";
 	status = "okay";
 	managed = "in-band-status";
 	phys = <&comphy0 1>;
