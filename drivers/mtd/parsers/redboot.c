@@ -305,6 +305,7 @@ static int parse_redboot_partitions(struct mtd_info *master,
 
 static const struct of_device_id mtd_parser_redboot_of_match_table[] = {
 	{ .compatible = "redboot-fis" },
+	{ .compatible = "ecoscentric,redboot-fis-partitions" },
 	{},
 };
 MODULE_DEVICE_TABLE(of, mtd_parser_redboot_of_match_table);
