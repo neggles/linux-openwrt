@@ -407,18 +407,8 @@ int add_mtd_blktrans_dev(struct mtd_blktrans_dev *new)
 	gd->first_minor = (new->devnum) << tr->part_bits;
 	gd->fops = &mtd_block_ops;
 
-	if (tr->part_bits)
-		if (new->devnum < 26)
-			snprintf(gd->disk_name, sizeof(gd->disk_name),
-				 "%s%c", tr->name, 'a' + new->devnum);
-		else
-			snprintf(gd->disk_name, sizeof(gd->disk_name),
-				 "%s%c%c", tr->name,
-				 'a' - 1 + new->devnum / 26,
-				 'a' + new->devnum % 26);
-	else
-		snprintf(gd->disk_name, sizeof(gd->disk_name),
-			 "%s%d", tr->name, new->devnum);
+	snprintf(gd->disk_name, sizeof(gd->disk_name),
+		 "%s%d", tr->name, new->devnum);
 
 	set_capacity(gd, ((u64)new->size * tr->blksize) >> 9);
 
