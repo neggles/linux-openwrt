@@ -10,7 +10,8 @@
 
 / {
 	model = "Linksys WRT1900ACS";
-	compatible = "linksys,shelby", "linksys,armada385", "marvell,armada385",
+	compatible = "linksys,wrt1900acs", "linksys,shelby",
+		     "linksys,armada385", "marvell,armada385",
 		     "marvell,armada380";
 };
 

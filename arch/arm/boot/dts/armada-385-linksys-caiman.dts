@@ -10,8 +10,8 @@
 
 / {
 	model = "Linksys WRT1200AC";
-	compatible = "linksys,caiman", "linksys,armada385", "marvell,armada385",
-		     "marvell,armada380";
+	compatible = "linksys,wrt1200ac", "linksys,caiman", "linksys,armada385",
+		     "marvell,armada385", "marvell,armada380";
 };
 
 &expander0 {
