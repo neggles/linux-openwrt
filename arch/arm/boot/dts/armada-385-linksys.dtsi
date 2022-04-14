@@ -212,11 +212,19 @@
 &pcie1 {
 	/* Marvell 88W8864, 5GHz-only */
 	status = "okay";
+
+	mwlwifi {
+		marvell,2ghz = <0>;
+	};
 };
 
 &pcie2 {
 	/* Marvell 88W8864, 2GHz-only */
 	status = "okay";
+
+	mwlwifi {
+		marvell,5ghz = <0>;
+	};
 };
 
 &pinctrl {
