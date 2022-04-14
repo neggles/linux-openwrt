@@ -654,6 +654,7 @@ static int rs5c372_probe(struct i2c_client *client,
 	int err = 0;
 	int smbus_mode = 0;
 	struct rs5c372 *rs5c372;
+	bool rs5c372_can_wakeup_device = false;
 
 	dev_dbg(&client->dev, "%s\n", __func__);
 
@@ -689,6 +690,12 @@ static int rs5c372_probe(struct i2c_client *client,
 	else
 		rs5c372->type = id->driver_data;
 
+#ifdef CONFIG_OF
+	if(of_property_read_bool(client->dev.of_node,
+					      "wakeup-source"))
+		rs5c372_can_wakeup_device = true;
+#endif
+
 	/* we read registers 0x0f then 0x00-0x0f; skip the first one */
 	rs5c372->regs = &rs5c372->buf[1];
 	rs5c372->smbus = smbus_mode;
@@ -722,6 +729,8 @@ static int rs5c372_probe(struct i2c_client *client,
 		goto exit;
 	}
 
+	rs5c372->has_irq = 1;
+
 	/* if the oscillator lost power and no other software (like
 	 * the bootloader) set it up, do it here.
 	 *
@@ -748,6 +757,10 @@ static int rs5c372_probe(struct i2c_client *client,
 			);
 
 	/* REVISIT use client->irq to register alarm irq ... */
+	if (rs5c372_can_wakeup_device) {
+		device_init_wakeup(&client->dev, true);
+	}
+
 	rs5c372->rtc = devm_rtc_device_register(&client->dev,
 					rs5c372_driver.driver.name,
 					&rs5c372_rtc_ops, THIS_MODULE);
@@ -760,6 +773,9 @@ static int rs5c372_probe(struct i2c_client *client,
 	err = rs5c_sysfs_register(&client->dev);
 	if (err)
 		goto exit;
+
+	/* the rs5c372 alarm only supports a minute accuracy */
+	rs5c372->rtc->uie_unsupported = 1;
 
 	return 0;
 
