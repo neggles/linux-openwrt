@@ -485,3 +485,7 @@
 		};
 	};
 };
+
+&coherencyfab {
+	broken-idle;
+};
